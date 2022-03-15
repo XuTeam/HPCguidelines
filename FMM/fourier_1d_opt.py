@@ -1,8 +1,3 @@
-"""
-@author: Zongyi Li
-This file is the Fourier Neural Operator for 2D problem such as the Darcy Flow discussed in Section 5.2 in the [paper](https://arxiv.org/pdf/2010.08895.pdf).
-"""
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -52,54 +47,37 @@ def waveletShrinkage(x, thr, mode='soft'):
 ################################################################
 # fourier layer
 ################################################################
-class SpectralConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, modes1, modes2, mode_threshold=False):
-        super(SpectralConv2d, self).__init__()
+class SpectralConv1d(nn.Module):
+    def __init__(self, in_channels, out_channels, modes1):
+        super(SpectralConv1d, self).__init__()
 
         """
-        2D Fourier layer. It does FFT, linear transform, and Inverse FFT.    
+        1D Fourier layer. It does FFT, linear transform, and Inverse FFT.    
         """
 
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.modes1 = modes1 #Number of Fourier modes to multiply, at most floor(N/2) + 1
-        self.modes2 = modes2
+        self.modes1 = modes1  #Number of Fourier modes to multiply, at most floor(N/2) + 1
 
-        self.scale = (1 / (in_channels * out_channels))
-#         self.scale = (1 / (out_channels))
-        
-        self.weights1 = nn.Parameter(self.scale * torch.rand(in_channels, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
-        self.weights2 = nn.Parameter(self.scale * torch.rand(in_channels, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
-        self.mode_threshold = mode_threshold
-#         self.mlp = FeedForward(out_channels, 128, out_channels)
-        self.shrink = nn.Softshrink()
+        self.scale = (1 / (in_channels*out_channels))
+        self.weights1 = nn.Parameter(self.scale * torch.rand(in_channels, out_channels, self.modes1, dtype=torch.cfloat))
+
     # Complex multiplication
-    def compl_mul2d(self, input, weights):
-        # (batch, in_channel, x,y ), (in_channel, out_channel, x,y) -> (batch, out_channel, x,y)
-        return torch.einsum("bixy,ioxy->boxy", input, weights)
+    def compl_mul1d(self, input, weights):
+        # (batch, in_channel, x ), (in_channel, out_channel, x) -> (batch, out_channel, x)
+        return torch.einsum("bix,iox->box", input, weights)
 
     def forward(self, x):
         batchsize = x.shape[0]
         #Compute Fourier coeffcients up to factor of e^(- something constant)
-        x_ft = torch.fft.rfft2(x)
+        x_ft = torch.fft.rfft(x)
 
         # Multiply relevant Fourier modes
-        out_ft = torch.zeros(batchsize, self.out_channels,  x.size(-2), x.size(-1)//2 + 1, dtype=torch.cfloat, device=x.device)
-        
-        if self.mode_threshold:
-            # out_ft = waveletShrinkage(out_ft, thr=1e-1, mode='relu') 
-            out_ft = self.shrink(out_ft)
-            
-        out_ft[:, :, :self.modes1, :self.modes2] = \
-            self.compl_mul2d(x_ft[:, :, :self.modes1, :self.modes2], self.weights1)
-        out_ft[:, :, -self.modes1:, :self.modes2] = \
-            self.compl_mul2d(x_ft[:, :, -self.modes1:, :self.modes2], self.weights2)
-        
-        
-        
+        out_ft = torch.zeros(batchsize, self.out_channels, x.size(-1)//2 + 1,  device=x.device, dtype=torch.cfloat)
+        out_ft[:, :, :self.modes1] = self.compl_mul1d(x_ft[:, :, :self.modes1], self.weights1)
 
         #Return to physical space
-        x = torch.fft.irfft2(out_ft, s=(x.size(-2), x.size(-1)))
+        x = torch.fft.irfft(out_ft, n=x.size(-1))
         return x
     
 class FeedForward(nn.Module):
@@ -163,9 +141,9 @@ class FeedForward(nn.Module):
                     print(f'Reset trainable parameters of layer = {l}')
                     l.reset_parameters()
                     
-class FNO2d(nn.Module):
-    def __init__(self, modes1, modes2,  width, num_spectral_layers=4, mlp_hidden_dim=128, mlp_LN=False, activation='gelu', mode_threshold=False, kernel_type='p', padding=9, lift_LN=False):
-        super(FNO2d, self).__init__()
+class FNO1d(nn.Module):
+    def __init__(self, modes,  width, num_spectral_layers=4, mlp_hidden_dim=128, mlp_LN=False, activation='gelu', mode_threshold=False, kernel_type='p', padding=9, lift_LN=False):
+        super(FNO1d, self).__init__()
 
         """
         The overall network. It contains 4 layers of the Fourier layer.
@@ -180,31 +158,30 @@ class FNO2d(nn.Module):
         output shape: (batchsize, x=s, y=s, c=1)
         """
 
-        self.modes1 = modes1
-        self.modes2 = modes2
+        self.modes = modes
         self.width = width
         self.num_spectral_layers = num_spectral_layers
         self.padding = padding # pad the domain if input is non-periodic
         if lift_LN:
             print('use liftLN')
             self.fc0 = nn.Sequential(
-                    nn.Linear(3, self.width),
+                    nn.Linear(2, self.width),
                     nn.LayerNorm(self.width))
         else:
-            self.fc0 = nn.Linear(3, self.width) # input channel is 3: (a(x, y), x, y)
+            self.fc0 = nn.Linear(2, self.width) # input channel is 3: (a(x, y), x, y)
         self.Spectral_Conv_List = nn.ModuleList([])
         for _ in range(num_spectral_layers - 1):
-            self.Spectral_Conv_List.append(SpectralConv2d(self.width, self.width, self.modes1, self.modes2, mode_threshold))
-        self.Spectral_Conv_List.append(SpectralConv2d(self.width, self.width, self.modes1, self.modes2, mode_threshold))    
+            self.Spectral_Conv_List.append(SpectralConv1d(self.width, self.width, self.modes))
+        self.Spectral_Conv_List.append(SpectralConv1d(self.width, self.width, self.modes))    
         
-        self.Conv2d_list = nn.ModuleList([])
+        self.Conv1d_list = nn.ModuleList([])
         if kernel_type == 'p':
             for _ in range(num_spectral_layers - 1):
-                self.Conv2d_list.append(nn.Conv2d(self.width, self.width, 1))
+                self.Conv1d_list.append(nn.Conv1d(self.width, 1))
         else:         
             for _ in range(num_spectral_layers - 1 ):
-                self.Conv2d_list.append(nn.Conv2d(self.width, self.width, kernel_size=3, stride=1, padding=1, dilation=1))
-        self.Conv2d_list.append(nn.Conv2d(self.width, self.width, kernel_size=3, stride=1, padding=1, dilation=1))
+                self.Conv1d_list.append(nn.Conv1d(self.width, self.width, kernel_size=3, stride=1, padding=1, dilation=1))
+        self.Conv1d_list.append(nn.Conv1d(self.width, self.width, kernel_size=3, stride=1, padding=1, dilation=1))
         
         if activation == 'relu':
             self.act = nn.ReLU()
@@ -214,22 +191,9 @@ class FNO2d(nn.Module):
             self.act = nn.Tanh()
         elif activation == 'silu':
             self.act = nn.SiLU()
-        else: raise NameError('invalid activation')
-
-#         self.conv0 = SpectralConv2d(self.width, self.width, self.modes1, self.modes2)
-#         self.conv1 = SpectralConv2d(self.width, self.width, self.modes1, self.modes2)
-#         self.conv2 = SpectralConv2d(self.width, self.width, self.modes1, self.modes2)
-#         self.conv3 = SpectralConv2d(self.width, self.width, self.modes1, self.modes2)
-#         self.w0 = nn.Conv2d(self.width, self.width, 1)
-#         self.w1 = nn.Conv2d(self.width, self.width, 1)
-#         self.w2 = nn.Conv2d(self.width, self.width, 1)
-#         self.w3 = nn.Conv2d(self.width, self.width, 1)
-        
-
-            
+        else: raise NameError('invalid activation')       
+          
         self.mlp = FeedForward(width, mlp_hidden_dim, 1, LN=mlp_LN)
-#         self.fc1 = nn.Linear(self.width, 128)
-#         self.fc2 = nn.Linear(128, 1)
         self.grid = None
 
     def forward(self, x):
@@ -240,52 +204,36 @@ class FNO2d(nn.Module):
         else: x = torch.cat((x, self.grid), dim=-1)
             
         x = self.fc0(x)
-        x = x.permute(0, 3, 1, 2)
-        x = F.pad(x, [0,self.padding, 0,self.padding])
+        x = x.permute(0, 2, 1)
+        x = F.pad(x, [0,self.padding])
         
         x1 = self.Spectral_Conv_List[0](x)
-        x2 = self.Conv2d_list[0](x)
+        x2 = self.Conv1d_list[0](x)
         x_shortcut = self.act(x1 + x2)
 
         
         for i in range(1, self.num_spectral_layers - 1):
             x1 = self.Spectral_Conv_List[i](x)
-            x2 = self.Conv2d_list[i](x)
+            x2 = self.Conv1d_list[i](x)
             x = x1 + x2
             x = self.act(x)
-        
-#         if self.grid is None:        
-#             grid = self.get_grid(x.shape, x.device)
-#             self.grid = grid
-#             x = torch.cat((x, grid), dim=1)
-#         else: x = torch.cat((x, self.grid), dim=1)
-        
+               
         x1 = self.Spectral_Conv_List[-1](x)
-        x2 = self.Conv2d_list[-1](x)
-        x = x1 + x2 + x_shortcut
-        
-        
+        x2 = self.Conv1d_list[-1](x)
+        x = x1 + x2 + x_shortcut       
 
-        x = x[..., :-self.padding, :-self.padding]
-        x = x.permute(0, 2, 3, 1)
+        x = x[..., :-self.padding]
+        x = x.permute(0, 2, 1)
         x = self.mlp(x)
         return x
     
     def get_grid(self, shape, device):
-        batchsize, size_x, size_y = shape[0], shape[1], shape[2]
+        batchsize, size_x = shape[0], shape[1]
         gridx = torch.tensor(np.linspace(0, 1, size_x), dtype=torch.float)
-        gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
-        gridy = torch.tensor(np.linspace(0, 1, size_y), dtype=torch.float)
-        gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-        return torch.cat((gridx, gridy), dim=-1).to(device)
+        gridx = gridx.reshape(1, size_x, 1).repeat([batchsize, 1, 1])
+        return gridx.to(device)
     
-#     def get_grid(self, shape, device):
-#         batchsize, size_x, size_y = shape[0], shape[2], shape[3]
-#         gridx = torch.tensor(np.linspace(0, 1, size_x), dtype=torch.float)
-#         gridx = gridx.reshape(1, 1, size_x, 1).repeat([batchsize, 1, 1, size_y])
-#         gridy = torch.tensor(np.linspace(0, 1, size_y), dtype=torch.float)
-#         gridy = gridy.reshape(1, 1, 1, size_y).repeat([batchsize, 1, size_x, 1])
-#         return torch.cat((gridx, gridy), dim=1).to(device)  
+
     
 class UnitGaussianNormalizer(object):
     def __init__(self, x, eps=0.00001):
@@ -325,7 +273,7 @@ class UnitGaussianNormalizer(object):
         self.std = self.std.cpu()
     
 class HsLoss(object):
-    def __init__(self, d=2, p=2, k=1, a=None, group=False, size_average=True, reduction=True, truncation=True, res=256):
+    def __init__(self, d=2, p=2, k=1, a=None, group=False, size_average=True, reduction=True, truncation=False, res=256):
         super().__init__()
 
         #Dimension and Lp-norm type are postive
@@ -341,23 +289,23 @@ class HsLoss(object):
         if a == None:
             a = [1,] * k
         self.a = a
-        k_x = torch.cat((torch.arange(start=0, end=res//2, step=1),torch.arange(start=-res//2, end=0, step=1)), 0).reshape(res,1).repeat(1,res)
-        k_y = torch.cat((torch.arange(start=0, end=res//2, step=1),torch.arange(start=-res//2, end=0, step=1)), 0).reshape(1,res).repeat(res,1)
+        k_x = torch.cat((torch.arange(start=0, end=res//2, step=1),torch.arange(start=-res//2, end=0, step=1)), 0).reshape(res,1)
+        # k_y = torch.cat((torch.arange(start=0, end=res//2, step=1),torch.arange(start=-res//2, end=0, step=1)), 0).reshape(1,res).repeat(res,1)
         
         if truncation:
-            self.k_x = (torch.abs(k_x)*(torch.abs(k_x)<20)).reshape(1,res,res,1) 
-            self.k_y = (torch.abs(k_y)*(torch.abs(k_y)<20)).reshape(1,res,res,1) 
+            self.k_x = (torch.abs(k_x)*(torch.abs(k_x)<20)).reshape(1,res, 1) 
+            # self.k_y = (torch.abs(k_y)*(torch.abs(k_y)<20)).reshape(1,res,res,1) 
         else:
-            self.k_x = torch.abs(k_x).reshape(1,res,res,1) 
-            self.k_y = torch.abs(k_y).reshape(1,res,res,1) 
+            self.k_x = torch.abs(k_x).reshape(1,res, 1) 
+            # self.k_y = torch.abs(k_y).reshape(1,res,res,1) 
             
     def cuda(self, device):
         self.k_x = self.k_x.to(device)
-        self.k_y = self.k_y.to(device)
+        # self.k_y = self.k_y.to(device)
 
     def cpu(self):
         self.k_x = self.k_x.cpu()
-        self.k_y = self.k_y.cpu()
+        # self.k_y = self.k_y.cpu()
 
     def rel(self, x, y):
         num_examples = x.size()[0]
@@ -372,22 +320,22 @@ class HsLoss(object):
 
     def __call__(self, x, y, a=None):
         nx = x.size()[1]
-        ny = x.size()[2]
+        # ny = x.size()[2]
         k = self.k
         balanced = self.balanced
         a = self.a
-        x = x.view(x.shape[0], self.res, self.res, -1)
-        y = y.view(y.shape[0], self.res, self.res, -1)
+        x = x.view(x.shape[0], self.res, -1)
+        y = y.view(y.shape[0], self.res, -1)
 
         
 
-        x = torch.fft.fftn(x, dim=[1, 2], norm='ortho')
-        y = torch.fft.fftn(y, dim=[1, 2], norm='ortho')
+        x = torch.fft.fftn(x, dim=[1], norm='ortho')
+        y = torch.fft.fftn(y, dim=[1], norm='ortho')
 
         if balanced==False:
             weight = 1
             if k >= 1:
-                weight += a[0]**2 * (self.k_x**2 + self.k_y**2)
+                weight += a[0]**2 * (self.k_x**2)
             if k >= 2:
                 weight += a[1]**2 * (k_x**4 + 2*k_x**2*k_y**2 + k_y**4)
             weight = torch.sqrt(weight)
@@ -396,7 +344,7 @@ class HsLoss(object):
         else:
             loss = self.rel(x, y)
             if k >= 1:
-                weight = a[0] * torch.sqrt(k_x**2 + k_y**2)
+                weight = a[0] * torch.sqrt(k_x**2)
                 loss += self.rel(x*weight, y*weight)
             if k >= 2:
                 weight = a[1] * torch.sqrt(k_x**4 + 2*k_x**2*k_y**2 + k_y**4)
@@ -405,48 +353,57 @@ class HsLoss(object):
 
         return loss, l2loss, x[:, :, 0], y[:, :, 0]
         
+        
 ################################################################
 # training and evaluation
 ################################################################
 
 def objective(modes, width, data='darcy', learning_rate=0.001, weight_decay=1e-4, batch_size=20, num_spectral_layers=4, activation='gelu', mlp_hidden_dim=128, optimizer_type='Adam', show_conv=False, mode_threshold=False, kernel_type='p', loss_type='h1', epochs=100, step_size=100, sampling_rate=3, padding=9, scheduler_type='StepLR', mlp_LN=False, lift_LN=False, GN=True):
     
-    ################################################################
-    # configs
-    ################################################################
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    TRAIN_PATH, TEST_PATH = getPath(data)
+
+    # TRAIN_PATH, TEST_PATH = getPath(data)
 
     ntrain = 1000
     ntest = 100
 
     epochs = epochs
-    step_size = step_size
+    step_size = 100
     gamma = 0.5
 
 
 
     r = sampling_rate
-#     h = int(((421 - 1)//r) + 1)
-#     s = h
-#     s = 128
+    #     h = int(((421 - 1)//r) + 1)
+    #     s = h
+    #     s = 128
     ################################################################
     # load data and data normalization
     ################################################################
-    reader = MatReader(TRAIN_PATH)
-    x_train = reader.read_field('coeff')[:ntrain,::r,::r] #[:,:s,:s]
-    y_train = reader.read_field('sol')[:ntrain,::r,::r] #[:,:s,:s]
+#     dataloader = MatReader('darcy1d_alpha2_tau10_1024_train.mat')
+#     x_data = dataloader.read_field('coeff')[:,::r]
+#     y_data = dataloader.read_field('sol')[:,::r]
 
-    reader.load_file(TEST_PATH)
-    x_test = reader.read_field('coeff')[:ntest,::r,::r] #[:,:s,:s]
-    y_test = reader.read_field('sol')[:ntest,::r,::r] #[:,:s,:s]
+#     x_train = x_data[:ntrain,:]
+#     y_train = y_data[:ntrain,:]
+
+#     dataloader.load_file('darcy1d_alpha2_tau10_1024_test.mat')
+#     x_test = dataloader.read_field('coeff')[:ntest,::r]  
+#     y_test = dataloader.read_field('sol')[:ntest,::r] 
+
+#     if GN:
+#         x_normalizer = UnitGaussianNormalizer(x_train)
+#         x_train = x_normalizer.encode(x_train)
+#         x_test = x_normalizer.encode(x_test)
+    dataloader = MatReader('burgers_data_R10.mat')
+    x_data = dataloader.read_field('a')[:,::r]
+    y_data = dataloader.read_field('u')[:,::r]
+
+    x_train = x_data[:ntrain,:]
+    y_train = y_data[:ntrain,:]
+    x_test = x_data[-ntest:,:]
+    y_test = y_data[-ntest:,:]
     
-    if GN:
-        x_normalizer = UnitGaussianNormalizer(x_train)
-        x_train = x_normalizer.encode(x_train)
-        x_test = x_normalizer.encode(x_test)
-
     s = x_train.size(1)
 
     x_train = x_train[...,np.newaxis]
@@ -454,10 +411,10 @@ def objective(modes, width, data='darcy', learning_rate=0.001, weight_decay=1e-4
 
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(x_train.contiguous().to(device), y_train.contiguous().to(device)), batch_size=batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(x_test.contiguous().to(device), y_test.contiguous().to(device)), batch_size=batch_size, shuffle=False)
-    
-    model = FNO2d(modes, modes, width, num_spectral_layers=num_spectral_layers, mlp_hidden_dim=mlp_hidden_dim, mode_threshold=mode_threshold, kernel_type=kernel_type, padding=padding, mlp_LN=mlp_LN, lift_LN=lift_LN).to(device)
+
+    model = FNO1d(modes, width, num_spectral_layers=num_spectral_layers, mlp_hidden_dim=mlp_hidden_dim, mode_threshold=mode_threshold, kernel_type=kernel_type, padding=padding, mlp_LN=mlp_LN, lift_LN=lift_LN).to(device)
     print(count_params(model))
-    
+
     if optimizer_type.lower()=='adam':
         optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     elif optimizer_type.lower()=='adamw':
@@ -465,40 +422,40 @@ def objective(modes, width, data='darcy', learning_rate=0.001, weight_decay=1e-4
     elif optimizer_type.lower()=='torch.adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     else:  raise NameError('invalid optimizer_type')
-    
+
     if scheduler_type.lower()=='steplr':
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=gamma)
     elif scheduler_type.lower()=='onecyclelr':
         scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=learning_rate, 
-                               div_factor=1e1, 
-                               final_div_factor=1e1,
-                               pct_start=0.2,
+                               div_factor=2, 
+                               final_div_factor=1e2,
+                               pct_start=0.1,
                                steps_per_epoch=1, 
                                epochs=epochs)  
     else:  raise NameError('invalid scheduler_type')
-  
-    
+
+
     h1loss = HsLoss(d=2, p=2, k=1, size_average=False, res=s, a=[2.,])
     h1loss.cuda(device)
     l2loss = LpLoss(size_average=False)  
-    
+
     y_normalizer = UnitGaussianNormalizer(y_train)
     y_normalizer.cuda(device)
 
     train_h1_rec, train_l2_rec, train_f_dist_rec, test_l2_rec, test_h1_rec = [], [], [], [], []
-    
+
     with tqdm(total=epochs) as pbar_ep:
-                            
+
         for epoch in range(epochs):
             model.train()
             train_l2, train_h1 = 0, 0
             train_f_dist = torch.zeros(s)
-            
+
             for x, y in train_loader:
                 optimizer.zero_grad()
-                out = model(x).reshape(batch_size, s, s)
-                out = y_normalizer.decode(out)
-     
+                out = model(x).reshape(batch_size, s)
+                # out = y_normalizer.decode(out)
+
                 if loss_type=='h1':
                     with torch.no_grad():
                         train_l2loss = l2loss(out, y)
@@ -511,7 +468,7 @@ def objective(modes, width, data='darcy', learning_rate=0.001, weight_decay=1e-4
 
                     train_l2loss = l2loss(out, y)
                     train_l2loss.backward()
-                    
+
                 optimizer.step()
                 train_h1 += train_h1loss.item()
                 train_l2 += train_l2loss.item()
@@ -526,8 +483,8 @@ def objective(modes, width, data='darcy', learning_rate=0.001, weight_decay=1e-4
             test_l2, test_h1 = 0., 0.
             with torch.no_grad():
                 for x, y in test_loader:
-                    out = model(x).reshape(batch_size, s, s)
-                    out = y_normalizer.decode(out)
+                    out = model(x).reshape(batch_size, s)
+                    # out = y_normalizer.decode(out)
 
                     test_l2 += l2loss(out, y).item()
                     test_h1 += h1loss(out, y)[0].item()
@@ -537,10 +494,10 @@ def objective(modes, width, data='darcy', learning_rate=0.001, weight_decay=1e-4
             test_l2 /= ntest
             test_h1/= ntest
             train_f_dist/= ntrain
-            
+
             train_l2_rec.append(train_l2); test_l2_rec.append(test_l2); train_h1_rec.append(train_h1); test_h1_rec.append(test_h1)
             train_f_dist_rec.append(train_f_dist)
-            
+
             desc = f"epoch: [{epoch+1}/{epochs}]"
             desc += f" | current lr: {lr:.3e}"
             desc += f"| train l2 loss: {train_l2:.3e} "
@@ -549,7 +506,7 @@ def objective(modes, width, data='darcy', learning_rate=0.001, weight_decay=1e-4
             desc += f"| val h1 loss: {test_h1:.3e} "
             pbar_ep.set_description(desc)
             pbar_ep.update()
-         
+
         if show_conv:
             plt.figure(1)
             plt.semilogy(np.array(train_l2_rec), label='train l2 loss')
@@ -559,14 +516,14 @@ def objective(modes, width, data='darcy', learning_rate=0.001, weight_decay=1e-4
             plt.grid(True, which="both", ls="--")
             plt.legend()
             plt.show()
-            
+
             temp = torch.stack(train_f_dist_rec)
             plt.figure()
             plt.semilogy(temp[:, 0:6].detach().cpu().numpy())
             plt.grid(True, which="both", ls="--")
             plt.legend(range(6))
             plt.show()
-            
+
             plt.figure()
             plt.semilogy(temp[:, 10:16].detach().cpu().numpy())
             plt.grid(True, which="both", ls="--")

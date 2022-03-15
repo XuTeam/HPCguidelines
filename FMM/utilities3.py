@@ -331,8 +331,11 @@ def getPath(data):
         TRAIN_PATH = '/home/liuxinliang/fourier_neural_operator-master/data_generation/darcy/darcy_alpha2_tau20_512_train.mat'
         TEST_PATH = '/home/liuxinliang/fourier_neural_operator-master/data_generation/darcy/darcy_alpha2_tau20_512_test.mat'
     elif data=='darcy20c6':
-        TRAIN_PATH = '/home/liuxinliang/fourier_neural_operator-master/data_generation/darcy/darcy_alpha2_tau20_c6_512_train.mat'
-        TEST_PATH = '/home/liuxinliang/fourier_neural_operator-master/data_generation/darcy/darcy_alpha2_tau20_c6_512_test.mat'
+        TRAIN_PATH = os.path.join(os.path.abspath(''), 'darcy_alpha2_tau5_512_train.mat')
+        TEST_PATH = os.path.join(os.path.abspath(''), 'darcy_alpha2_tau5_512_test.mat')
+    elif data=='darcy15c10':
+        TRAIN_PATH = os.path.join(os.path.abspath(''), 'darcy_alpha2_tau15_c10_512_train.mat')
+        TEST_PATH = os.path.join(os.path.abspath(''), 'darcy_alpha2_tau15_c10_512_test.mat')
     elif data=='a3f2':
         TRAIN_PATH = os.path.join(os.path.abspath(''), 'data/mul_res1023_a3f2_train.mat')
         TEST_PATH = os.path.join(os.path.abspath(''), 'data/mul_res1023_a3f2_test.mat')
@@ -345,6 +348,8 @@ def getPath(data):
     elif data=='checkerm4':
         TRAIN_PATH = '/home/xubo/multiscale-attention/data/mul_res1023_a7f1m4_train.mat'
         TEST_PATH = '/home/xubo/multiscale-attention/data/mul_res1023_a7f1m4_test.mat'
+    elif data=='burgers':
+        TRAIN_PATH = os.path.join(os.path.abspath(''), 'burgers_data_R10.mat')
     else: raise NameError('invalid data name')
     
     return TRAIN_PATH, TEST_PATH

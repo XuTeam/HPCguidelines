@@ -1220,7 +1220,7 @@ class HsLoss(object):
 # training and evaluation
 ################################################################
 
-def objective(modes, width, data='a3f2', learning_rate=0.001, weight_decay=1e-4, batch_size=20, num_spectral_layers=4, activation='gelu', mlp_hidden_dim=128, optimizer_type='Adam', show_conv=False, mode_threshold=False, kernel_type='p', loss_type='l2', sampling_rate=2, epochs=100, padding=9, GN=True):
+def objective(modes, width, data='a3f2', learning_rate=0.001, weight_decay=1e-4, batch_size=20, num_spectral_layers=4, activation='gelu', mlp_hidden_dim=128, optimizer_type='Adam', show_conv=False, mode_threshold=False, kernel_type='p', loss_type='l2', sampling_rate=2, epochs=100, padding=9, GN=True, final_div_factor=1e1):
     
     ################################################################
     # configs
@@ -1277,7 +1277,7 @@ def objective(modes, width, data='a3f2', learning_rate=0.001, weight_decay=1e-4,
                      norm_layer=nn.LayerNorm, ape=False, patch_norm=None,
                      use_checkpoint=False, stride=sampling_rate, patch_padding=6).to(device)
         
-    elif data=='darcy20'or data=='darcy20c6':
+    elif data in ('darcy20', 'darcy20c6', 'darcy15c10'):
         model = FMMTransformer(img_size=512, patch_size=4, in_chans=1, num_classes=2,
                      embed_dim=width-2, depths=[1, 1, 1], num_heads=[1, 1, 1],
                      window_size=[4, 4, 4], mlp_ratio=4., qkv_bias=False, qk_scale=None,
@@ -1305,7 +1305,7 @@ def objective(modes, width, data='a3f2', learning_rate=0.001, weight_decay=1e-4,
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=learning_rate, 
                                div_factor=1e1, 
-                               final_div_factor=1e1,
+                               final_div_factor=final_div_factor,
                                pct_start=0.2,
                                steps_per_epoch=1, 
                                epochs=epochs)
