@@ -8,10 +8,13 @@
 https://pytorch.org/vision/stable/datasets.html
 ### 1.2.2 自定义数据集
 自行写一个 data download 程序并包含在你的code里面
+### 1.2.3 
+如果是非常大的数据集，可以申请IT部门下载，你需要提供数据的specs以供IT下载
 
-# 2 Enviroment and sofeware
+
+# 2 Enviroment and software
 ## 2.1 Available Modules on HPC
-一些module使用前需要申请，比如MATLAB。大部分软件只需要使用前输入命令 module load cmake/3.16.1/gcc4.8.5 
+一些module使用前需要申请，比如MATLAB。大部分软件只需要slurm文件里输入命令， 比如 module load cmake/3.16.1/gcc4.8.5 。关于slurm  更多命令使用请上网搜索
 
 
 
@@ -124,7 +127,7 @@ https://www.hpc.kaust.edu.sa/ibex/best-practices-using-conda-pip-ibex
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --job-name=myjob
-#SBATCH –output=myjob.%J.out
+#SBATCH --output=myjob.%J.out
 #SBATCH --error=myjob.%J.err
 #SBATCH --time=8:00:00
 #SBATCH --partition=batch
