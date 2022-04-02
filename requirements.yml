@@ -1,0 +1,13 @@
+channels:
+  - pytorch
+dependencies:
+  - python=3.7
+  - pytorch=1.8.0=py3.7_cuda10.1_cudnn7.6.3_0
+  - torchvision=0.9.0=py37_cu101
+  - tqdm=4.59.0=pyhd3eb1b0_1
+  - numpy=1.20.1=py37h93e21f0_0
+  - numpy-base=1.20.1=py37h7d8b39e_0
+  - numpydoc=1.1.0=pyhd3eb1b0_1
+  - pandas=1.2.4=py37h2531618_0
+  - matplotlib=3.3.4=py37h06a4308_0
+  - matplotlib-base=3.3.4=py37h62a2d02_0

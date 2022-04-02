@@ -8,10 +8,13 @@
 https://pytorch.org/vision/stable/datasets.html
 ### 1.2.2 自定义数据集
 自行写一个 data download 程序并包含在你的code里面
+### 1.2.3 
+如果是非常大的数据集，可以申请IT部门下载，你需要提供数据的specs以供IT下载
 
-# 2 Enviroment and sofeware
+
+# 2 Enviroment and software
 ## 2.1 Available Modules on HPC
-一些module使用前需要申请，比如MATLAB。大部分软件只需要使用前输入命令 module load cmake/3.16.1/gcc4.8.5 
+一些module使用前需要申请，比如MATLAB。大部分软件只需要slurm文件里输入命令， 比如 module load cmake/3.16.1/gcc4.8.5 。关于slurm  更多命令使用请上网搜索
 
 
 
@@ -119,39 +122,25 @@ https://www.hpc.kaust.edu.sa/ibex/best-practices-using-conda-pip-ibex
 # 3 Slurm
 所有可执行命令和程序都需要通过Slurm系统提交，你需要写一个 yours.sh 脚本来执行你的环境命令和运行程序。以下是一个例子
 
+```javascript I'm A tab
 #!/bin/bash
-## SLURM Resource requirement:
-#SBATCH --nodes=1
+#SBATCH --nodes=1  # 
 #SBATCH --ntasks=1
 #SBATCH --job-name=myjob
-#SBATCH –output=myjob.%J.out
+#SBATCH --output=myjob.%J.out
 #SBATCH --error=myjob.%J.err
 #SBATCH --time=8:00:00
 #SBATCH --partition=batch
 ##指定GPU数量
-#SBATCH --gres=gpu:a100:1 
+#SBATCH --gres=gpu:a100:1  # 指定GPU 数量 类型
 ## Required software list:
 module load intel/2020
 ## Run the application:
 echo "This job ran on $SLURM_NODELIST dated `date`";
 ./my_exe
-##### 现有资源248 a100，一般任务使用#SBATCH --partition=batch就可以
+```
+
+#### 现有资源248 a100，一般任务使用#SBATCH --partition=batch就可以
 
 
-
-
-batch*        up 14-00:00:0      2  down$ gpu203-23-l,gpu203-23-r
-batch*        up 14-00:00:0      1  maint gpu108-02-l
-batch*        up 14-00:00:0      2  down* cn113-34-l,cn113-35-l
-batch*        up 14-00:00:0     27    mix gpu101-02-l,gpu101-02-r,gpu101-09-l,gpu101-09-r,gpu101-16-l,gpu101-16-r,gpu108-02-r,gpu108-09-l,gpu108-09-r,gpu108-16-l,gpu108-16-r,gpu108-23-l,gpu108-23-r,gpu109-02-l,gpu109-02-r,gpu109-09-l,gpu109-09-r,gpu109-16-l,gpu109-16-r,gpu109-23-l,gpu109-23-r,gpu201-02-l,gpu201-02-r,gpu201-09-l,gpu201-09-r,gpu201-16-l,gpu201-16-r
-batch*        up 14-00:00:0     16   idle gpu201-23-l,gpu201-23-r,gpu202-02-l,gpu202-02-r,gpu202-09-l,gpu202-09-r,gpu202-16-l,gpu202-16-r,gpu202-23-l,gpu202-23-r,gpu203-02-l,gpu203-02-r,gpu203-09-l,gpu203-09-r,gpu203-16-l,gpu203-16-r
-gpu24         up 1-00:00:00      1    mix gpu101-09-r
-gpu_wide      up 14-00:00:0      2    mix gpu110-[02,09]
-gpu_wide24    up 1-00:00:00      4  drain gpu102-[02,09],gpu110-[16,23]
-gpu_wide24    up 1-00:00:00      3    mix gpu102-16,gpu110-[02,09]
-gpu_wide24    up 1-00:00:00      1   idle gpu102-23
-gpu4          up    4:00:00      2  down$ gpu203-23-l,gpu203-23-r
-gpu4          up    4:00:00      1  maint gpu108-02-l
-gpu4          up    4:00:00      4  drain gpu102-[02,09],gpu110-[16,23]
-gpu4          up    4:00:00     29    mix gpu101-02-r,gpu101-09-l,gpu101-09-r,gpu101-16-l,gpu101-16-r,gpu102-16,gpu108-02-r,gpu108-09-l,gpu108-09-r,gpu108-16-l,gpu108-16-r,gpu108-23-l,gpu108-23-r,gpu109-02-l,gpu109-02-r,gpu109-09-l,gpu109-09-r,gpu109-16-l,gpu109-16-r,gpu109-23-l,gpu109-23-r,gpu110-[02,09],gpu201-02-l,gpu201-02-r,gpu201-09-l,gpu201-09-r,gpu201-16-l,gpu201-16-r
-gpu4          up    4:00:00     16   idle gpu201-23-l,gpu201-23-r,gpu202-02-l,gpu202-02-r,gpu202-09-l,gpu202-09-r,gpu202-16-l,gpu202-16-r,gpu202-23-l,gpu202-23-r,gpu203-02-l,gpu203-02-r,gpu203-09-l,gpu203-09-r,gpu203-16-l,gpu203-16-r
+![](sinfo.png)
