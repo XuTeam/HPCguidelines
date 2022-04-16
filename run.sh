@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 #SBATCH --nodes=1  
 #SBATCH --ntasks=1  
 #SBATCH --job-name=DLCodeDemo  
@@ -10,6 +8,8 @@
 #SBATCH --time=12:00:00  
 #SBATCH --partition=batch  
 #SBATCH --gres=gpu:a100:1 
+
+# --gres=gpu:a100:1   the last number is the number of GPUs you want to use. Chnange it if you need many GPUs
 
 # Change to your name (last name and first name, lower case, for example jianqingzhu).
 cd ~/jianqingzhu/MgNet_code
@@ -22,7 +22,7 @@ git pull
 eval "$(conda shell.bash hook)"
 
 # Change to the name to your conda env.
-conda activate anconda3 
+conda activate jianqingzhu_env 
 
 python run.py
 conda deactivate

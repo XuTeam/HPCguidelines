@@ -4,7 +4,7 @@ cd ~
 pwd
 
 # Change to your name (last name and first name, lower case, for example jianqingzhu).
-mkdir jianqingzhu     
+mkdir jianqingzhu 
 cd ~/jianqingzhu
 pwd
 
