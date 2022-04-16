@@ -5,7 +5,7 @@
 #SBATCH --job-name=DLCodeDemo  
 #SBATCH --output=DLCodeDemo.out  
 #SBATCH --error=DLCodeDemo.err  
-#SBATCH --time=12:00:00  
+#SBATCH --time=24:00:00  
 #SBATCH --partition=batch  
 #SBATCH --gres=gpu:a100:1 
 
