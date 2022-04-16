@@ -16,14 +16,14 @@ On your local computer, activate the conda evniroment under which your code is r
 
 conda env export > requirements.yaml
 
-This will generate a file requirements.yaml. Add this file to github repository.
+This will generate a file requirements.yaml. Add this file to github repository. Try your best to use as least pacakages as you can. Use package competiable with the GCC gcc version 4.8.5 with glibc-2.17-323. Older version packages fit better to KAUST system. 
 
 # 3 A script for setup 
 In this repository, there is a file install.sh, which need to be modified and then added to your github repository. Check the detail in install.sh.
 
-Note that: the above 3 steps only need to be done when you use the HPC systey at the first time.
+Note that: the above 3 steps only need to be done when you use the HPC system at the first time.
 
-# 4 A scipt for running
+# 4 A script for running
 In this repository, there is a file run.sh, which pull your updated code, submit the jobs with multiple GPUs and push the results when the job is finished. Check the detail in run.sh.
 
 All the output files should be named with "*.out", otherwise they can not be pushed to your github repository.
