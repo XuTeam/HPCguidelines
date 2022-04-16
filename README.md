@@ -30,13 +30,13 @@ All the output files should be named with "*.out", otherwise they can not be pus
 
 # Finally, your repository should include at least the following files:
 
-1 Your code and data
+1. Your code and data
 
-2 Conda enviroment file: requirements.yaml
+2. Conda enviroment file: requirements.yaml
 
-3 A modified install.sh
+3. A modified install.sh
 
-4 A modified run.sh
+4. A modified run.sh
 
 # Other things you may want to know
 
